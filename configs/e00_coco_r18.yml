@@ -1,0 +1,17 @@
+# E-00: the released RT-DETRv2-S (R18) COCO checkpoint through our export / TensorRT / evaluator path.
+# Use with ird.export.export_onnx and ird.infer.predict only (not for training).
+__include__: ['./base_rtdetrv2_r18.yml']
+
+num_classes: 80
+eval_spatial_size: [640, 640]
+
+val_dataloader:
+  dataset:
+    ann_file: data/coco_val2017_canonical.json
+    data_root: ../coco
+    modality: vis
+    out_hw: [640, 640]
+
+ird:
+  arm: E-00
+  in_channels: 3

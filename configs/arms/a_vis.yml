@@ -1,0 +1,14 @@
+# Arm A-VIS. See README.md, section "Training arms".
+__include__: ['../base_rtdetrv2_r18.yml']
+
+train_dataloader:
+  dataset:
+    modality: vis
+
+val_dataloader:
+  dataset:
+    modality: vis
+
+ird:
+  arm: A-VIS
+  in_channels: 3

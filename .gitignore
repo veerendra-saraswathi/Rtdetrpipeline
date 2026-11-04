@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+/build/
+
+# Editor
+.vscode/
+
+# Third-party code fetched by setup (not vendored)
+/third_party/RT-DETR/
+
+# Data, weights and generated outputs (kept on the training machine, not in Git)
+/data/
+/weights/
+/runs/
+/preds/
+/reports/
+/export/
+/quick12/
+golden/
+*.pth
+*.onnx
+*.engine
+*.calib
+*.cache
+*.so
+*.pyd
+*.dll
+*.exe

@@ -1,0 +1,14 @@
+# Arm B. See README.md, section "Training arms".
+__include__: ['../base_rtdetrv2_r18.yml']
+
+train_dataloader:
+  dataset:
+    modality: joint
+    gray_p: 0.0      # set 0.5 to turn half the visible frames grey (doc v0.3 option)
+val_dataloader:
+  dataset:
+    modality: ir
+
+ird:
+  arm: B
+  in_channels: 3

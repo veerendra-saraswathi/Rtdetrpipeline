@@ -1,0 +1,174 @@
+# RT-DETRv2-S (ResNet18-vd) for IRD. Self-contained: every setting is here, so a run is fully
+# described by this file + the arm file + run_info.json. Values follow the official
+# rtdetrv2_r18vd_120e_coco.yml unless marked IRD.
+
+task: detection
+num_classes: 4                 # IRD master list: 0 ship, 1 tank, 2 aircraft, 3 civil_vehicle
+remap_mscoco_category: False
+
+evaluator:
+  type: CocoEvaluator
+  iou_types: ['bbox']
+
+model: RTDETR
+criterion: RTDETRCriterionv2
+postprocessor: RTDETRPostProcessor
+use_focal_loss: True
+eval_spatial_size: [512, 640]  # IRD: h, w of the network input (native IR 640x512)
+
+RTDETR:
+  backbone: PResNet
+  encoder: HybridEncoder
+  decoder: RTDETRTransformerv2
+
+PResNet:
+  depth: 18
+  variant: d
+  freeze_at: -1
+  return_idx: [1, 2, 3]
+  num_stages: 4
+  freeze_norm: False
+  pretrained: False            # IRD: all weights come from the COCO checkpoint (--tuning)
+
+HybridEncoder:
+  in_channels: [128, 256, 512]
+  feat_strides: [8, 16, 32]
+  hidden_dim: 256
+  use_encoder_idx: [2]
+  num_encoder_layers: 1
+  nhead: 8
+  dim_feedforward: 1024
+  dropout: 0.
+  enc_act: 'gelu'
+  expansion: 0.5
+  depth_mult: 1
+  act: 'silu'
+
+RTDETRTransformerv2:
+  feat_channels: [256, 256, 256]
+  feat_strides: [8, 16, 32]
+  hidden_dim: 256
+  num_levels: 3
+  num_layers: 3
+  num_queries: 300
+  num_denoising: 100
+  label_noise_ratio: 0.5
+  box_noise_scale: 1.0
+  eval_idx: -1
+  num_points: [4, 4, 4]
+  cross_attn_method: default
+  query_select_method: default
+
+RTDETRPostProcessor:
+  num_top_queries: 300
+
+RTDETRCriterionv2:
+  weight_dict: {loss_vfl: 1, loss_bbox: 5, loss_giou: 2}
+  losses: ['vfl', 'boxes']
+  alpha: 0.75
+  gamma: 2.0
+  matcher:
+    type: HungarianMatcher
+    weight_dict: {cost_class: 2, cost_bbox: 5, cost_giou: 2}
+    alpha: 0.25
+    gamma: 2.0
+
+use_amp: False
+scaler:
+  type: GradScaler
+  enabled: True
+
+use_ema: True
+ema:
+  type: ModelEMA
+  decay: 0.9999
+  warmups: 1000                # IRD: ~10 epochs at 97 iterations/epoch
+
+epoches: 72
+clip_max_norm: 0.1
+
+optimizer:
+  type: AdamW
+  params:
+    - params: '^(?=.*backbone)(?!.*norm).*$'
+      lr: 0.00001
+    - params: '^(?=.*(?:encoder|decoder))(?=.*(?:norm|bn)).*$'
+      weight_decay: 0.
+  lr: 0.0001
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
+
+lr_scheduler:
+  type: MultiStepLR
+  milestones: [1000]
+  gamma: 0.1
+
+lr_warmup_scheduler:
+  type: LinearWarmup
+  warmup_duration: 500         # IRD: small dataset
+
+print_freq: 50
+output_dir: ./runs/unnamed
+checkpoint_freq: 1000          # IRD: keep only last.pth and best.pth
+sync_bn: False
+find_unused_parameters: False
+
+# ---- data (arm files set modality and files) -------------------------------------------
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: IRDDetection
+    ann_file: data/airst_v0.1s/airst_train.json
+    data_root: ..              # folder that contains AIRST-CS_ship_only/
+    modality: ir
+    out_hw: [512, 640]
+    ir_params: {tone: percentile, p_lo: 0.5, p_hi: 99.5, pad_value: 0.0}
+    vis_params: {tone: linear, p_lo: 0.5, p_hi: 99.5, pad_value: 0.0}
+    gray_p: 0.0
+    transforms:
+      type: Compose
+      ops:
+        - {type: IRDPhotometric, p: 0.5, brightness: 0.1, contrast: [0.8, 1.2], noise_std: 0.02}
+        - {type: RandomZoomOut, fill: 0, side_range: [1.0, 2.0]}   # IRD: max 2x (default 4x would shrink 16 px targets to 4 px)
+        - {type: RandomIoUCrop, p: 0.8}
+        - {type: SanitizeBoundingBoxes, min_size: 1}
+        - {type: RandomHorizontalFlip}
+        - {type: Resize, size: [512, 640]}
+        - {type: SanitizeBoundingBoxes, min_size: 1}
+        - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
+      policy:
+        name: stop_epoch
+        epoch: 66              # last 6 epochs without strong augmentation (official: 71 of 72)
+        ops: ['IRDPhotometric', 'RandomZoomOut', 'RandomIoUCrop']
+  shuffle: True
+  total_batch_size: 8
+  num_workers: 4
+  drop_last: True
+  collate_fn:
+    type: BatchImageCollateFunction
+    scales: [[416, 512], [448, 576], [480, 608], [512, 640], [512, 640], [512, 640], [544, 672], [576, 704], [608, 768]]
+    stop_epoch: 66
+
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: IRDDetection
+    ann_file: data/airst_v0.1s/airst_val.json
+    data_root: ..
+    modality: ir
+    out_hw: [512, 640]
+    ir_params: {tone: percentile, p_lo: 0.5, p_hi: 99.5, pad_value: 0.0}
+    vis_params: {tone: linear, p_lo: 0.5, p_hi: 99.5, pad_value: 0.0}
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: False
+  total_batch_size: 8
+  num_workers: 4
+  drop_last: False
+  collate_fn:
+    type: BatchImageCollateFunction
+
+ird:
+  arm: base
+  in_channels: 3

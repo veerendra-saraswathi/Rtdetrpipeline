@@ -1,0 +1,18 @@
+# Arm B-ft-IR: start from B's best.pth (--tuning runs/b_joint/s<seed>/best.pth), fine-tune on IR only.
+__include__: ['./a_ir.yml']
+epoches: 24
+optimizer:
+  lr: 0.00005
+lr_warmup_scheduler:
+  warmup_duration: 100
+ema:
+  warmups: 300
+train_dataloader:
+  dataset:
+    transforms:
+      policy:
+        epoch: 20
+  collate_fn:
+    stop_epoch: 20
+ird:
+  arm: B-ft-IR
