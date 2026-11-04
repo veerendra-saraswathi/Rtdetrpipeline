@@ -202,8 +202,7 @@ scores one labeling of each duplicate frame against the other.
 ## Third-party code
 
 | Item | Use | License |
-|---|---|---|
-| RT-DETRv2 (lyuwenyu/RT-DETR) | model and training code (not vendored; cloned) | Apache-2.0 |
+|---|---|---| | Apache-2.0 |
 | PyTorch, torchvision | training | BSD-3 |
 | pybind11 | Python binding of the preprocessing | BSD-3 |
 | stb_image.h (`third_party/stb`) | PNG reading in `ird_infer` only (tool, not runtime) | Public domain / MIT |
